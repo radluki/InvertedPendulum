@@ -1,0 +1,4 @@
+Compile this way:
+
+g++ bt.cpp -o bt -lboost_locale
+
