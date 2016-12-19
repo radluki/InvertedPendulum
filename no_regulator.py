@@ -1,9 +1,8 @@
-from scipy.integrate import odeint
-import numpy as np
 import matplotlib.pyplot as plt
-import time
-
+import numpy as np
 from pendulum import InvertedPendulum
+from scipy.integrate import odeint
+
 
 if __name__ == '__main__':
     # pendulum parameters

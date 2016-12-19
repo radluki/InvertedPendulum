@@ -1,14 +1,12 @@
-from scipy.integrate import odeint
-import numpy as np
-import matplotlib.pyplot as plt
-import time
-from regulators import RegulatorLQR
-from pendulum import InvertedPendulum
 import json
 import sys
+import numpy as np
 import scipy.io
+from pendulum import InvertedPendulum
+from scipy.integrate import odeint
+from cost import RegulationTime
+from regulators import RegulatorLQR
 
-from cost import RegulationTime, SumOfErrorSquared
 
 
 def simulate_linear_pendulum(K=None,cost_obj=RegulationTime()):

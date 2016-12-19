@@ -27,10 +27,10 @@ class InvertedPendulum(object):
         self.regulator = regulator
         self.set_point = np.array(set_point)
         self.force = list()
-        self.a = 1e3
-        self.Fc = 8 #3.8
+        self.a = 1e4
+        self.Fc = 3.0 #3.8
         self.x_swing = 0.5
-        self.percent_energy = 3e-1
+        self.percent_energy = 1e-2
         self.lqr_cond_rej = 0 # 0 swingup
 
     def x_dot(self,x,t=0,F=0):
@@ -38,12 +38,19 @@ class InvertedPendulum(object):
         x1 = x[1]
         theta0 = x[2]
         theta1 = x[3]
-
+        # if not (np.linalg.det(self.mat1 + self.mat2*np.cos(theta0))**2 > 1e-6):
+        #     print(x)
+        #assert np.linalg.det(self.mat1 + self.mat2*np.cos(theta0))**2 > 1e-6
         x2,theta2 = np.linalg.inv(self.mat1 + self.mat2*np.cos(theta0)).dot(\
             [-self.b*x1 + self.m*self.l*theta1**2*np.sin(theta0) + F,\
              -self.m*self.g*self.l*np.sin(theta0)])
 
         x_prime = [x1,x2,theta1,theta2]
+        # if np.any(np.isnan(x_prime)):
+        #     print(x_prime)
+        #     print("x",x)
+        #     print("det",np.linalg.det(self.mat1 + self.mat2*np.cos(theta0)))
+        #assert not np.any(np.isnan(x_prime))
         return x_prime
 
     def x_dot_with_regulator(self, x, t):
@@ -53,30 +60,53 @@ class InvertedPendulum(object):
 
         return x_dot
 
+    def x_dot_with_regulator_ode(self,t,x):
+        """Interface for ode solver"""
+        xdot = np.array(self.x_dot_with_regulator(x,t))
+        return xdot
+
     def epsilon(self,x):
+        """Calculates angle from upward position"""
         eps = x - self.set_point * self.stairs(x[2], 2 * np.pi) / np.pi
         return eps
 
     def calculate_force(self,x):
-        e = self.pendulum_energy(x[2],x[3])
-        if 1:#self.lqr_cond_rej<1-1e-5:
-            lqr_cond = self.lqr_cond(x[2],x[3])
-        else:
-            lqr_cond = 1
-        self.lqr_cond_rej = lqr_cond
-        eps = x - self.set_point * self.stairs(x[2],2*np.pi)/np.pi
-        F = self.regulator.control(x, self.set_point * self.stairs(x[2],2*np.pi)/np.pi) * lqr_cond #* self.step(0.3 - np.linalg.norm(eps[3]))
-        swingup_direction = self.sign(-np.cos(x[2])*x[3])
-        F += self.Fc*(self.x_swing*swingup_direction-x[0])*(1-lqr_cond) * self.sign(self.m*self.g*self.l - e)
-        # F += self.Fc * swingup_direction * (1 - lqr_cond) * self.sign(self.m*self.g*self.l - e)
+        set_point2 = self.set_point * self.stairs(x[2],2*np.pi)/np.pi   # enables multiple rotations
+        F =  self.stabilizing_regulator(30,x,set_point2)# lqr
+        F += self.swing_up_regulator(40,x,set_point2)
+
+        return F#np.clip(F,-2*self.Fc,2*self.Fc)
+
+    def stabilizing_regulator(self,zone_in_degrees,x,set_point2):
+        in_zone = self.step(zone_in_degrees*np.pi/180 - np.abs(x[2]-set_point2[2]))
+        #lqr_cond_val = self.lqr_cond(self.pendulum_energy(x[2],x[3]))
+        return self.regulator.control(x, set_point2) * in_zone #* lqr_cond_val
+
+    def swing_up_regulator(self,zone_in_degrees,x,set_point2):
+        e = self.pendulum_energy(x[2], x[3])  # energy
+        lqr_cond = self.lqr_cond(e)  # check energy
+
+        swingup_direction = self.sign(-np.cos(x[2]) * x[3])
+        increase_energy_cond = self.sign(self.m * self.g * self.l - e)
+        change_energy_cond = (1 - lqr_cond)
+        in_zone = self.step( -(zone_in_degrees * np.pi / 180 - np.abs(x[2] - set_point2[2])))
+        # F = self.Fc * (self.x_swing * swingup_direction - x[0]) * increase_energy_cond*change_energy_cond*in_zone
+        F = self.Fc * swingup_direction  * increase_energy_cond * change_energy_cond * in_zone
+
         return F
 
-    def lqr_cond(self,x2,x3):
-        e = self.pendulum_energy(x2, x3)
+    def lqr_cond(self,e):
+        """Required energy must be between bounds for lqr"""
         Emin = self.m * self.g * self.l * (1 - self.percent_energy)
         Emax = self.m * self.g * self.l * (1 + self.percent_energy)
         lqr_cond = self.square(e - Emin, Emax - e)
         return lqr_cond
+
+    def lqr_cond2(self,x2,x3):
+        """For visualization purposes"""
+        set_point2 = self.set_point * self.stairs(x2, 2 * np.pi) / np.pi
+        self.lqr_cond_rej = self.step(30 * np.pi / 180 - np.abs(x2 - set_point2[2]))
+        return self.lqr_cond_rej
 
     def step(self, t):
         return 0.5 * (np.tanh(self.a*t) + 1)

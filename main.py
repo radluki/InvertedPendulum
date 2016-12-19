@@ -1,14 +1,12 @@
-from scipy.integrate import odeint
-import numpy as np
-import matplotlib.pyplot as plt
 import time
-from scipy.optimize import fmin_bfgs,minimize
-
-from regulators import RegulatorLQR
+import numpy as np
 from pendulum import InvertedPendulum
-from cost import RegulationTime, SumOfErrorSquared
-
+from scipy.integrate import odeint
+from scipy.optimize import fmin_bfgs
+from cost import RegulationTime
+from regulators import RegulatorLQR
 from swing_up_test import plot_state
+
 
 def simulate_linear_pendulum(K=None,cost_obj=RegulationTime()):
     if K is not None:

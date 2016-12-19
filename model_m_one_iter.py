@@ -1,12 +1,8 @@
-from scipy.integrate import odeint
-import numpy as np
-import matplotlib.pyplot as plt
-import time
-from regulators import RegulatorLQR
-from pendulum import InvertedPendulum
-import json
-import sys
+
 import scipy.io
+from pendulum import InvertedPendulum
+from regulators import RegulatorLQR
+
 
 
 if __name__ == '__main__':
